@@ -1,0 +1,796 @@
+<title>Riddleman</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a centered "card on a counter" composition — a tall water
+   glass sits beside the riddle panel, like a drink set down next to a
+   puzzle book. Glass fills and swishes with wrong guesses; spill = game over. */
+:root{
+  --ink:#0e2230;
+  --ink-soft:#3a5566;
+  --paper:#f4f1ea;
+  --panel:#ffffff;
+  --rule:#d8d2c4;
+  --water:#3aa0c9;
+  --water-deep:#1f7aa0;
+  --accent:#c6632f;
+  --good:#3f8f5f;
+  --bad:#c0432f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#eef2f4;
+    --ink-soft:#9fb3bd;
+    --paper:#0f1a20;
+    --panel:#162530;
+    --rule:#28404a;
+    --water:#4db3dd;
+    --water-deep:#2a8fb8;
+    --accent:#e08a52;
+    --good:#5cb986;
+    --bad:#e2695a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#eef2f4;
+  --ink-soft:#9fb3bd;
+  --paper:#0f1a20;
+  --panel:#162530;
+  --rule:#28404a;
+  --water:#4db3dd;
+  --water-deep:#2a8fb8;
+  --accent:#e08a52;
+  --good:#5cb986;
+  --bad:#e2695a;
+  color-scheme: dark;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"JetBrains Mono", ui-monospace, monospace;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+}
+
+.wrap{
+  max-width:860px;
+  margin:0 auto;
+  padding-block: 28px 40px;
+  display:flex;
+  flex-direction:column;
+  gap:22px;
+  min-height:100%;
+}
+
+header{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+h1{
+  font-family:"Fraunces", Georgia, serif;
+  font-weight:700;
+  font-size:clamp(1.8rem, 4vw, 2.5rem);
+  margin:0;
+  letter-spacing:-0.01em;
+}
+h1 em{
+  font-style:italic;
+  font-weight:500;
+  color:var(--water-deep);
+}
+.tagline{
+  font-size:0.78rem;
+  color:var(--ink-soft);
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+}
+
+/* ---- setup screen ---- */
+.setup-panel{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:26px;
+}
+.setup-panel h2{
+  font-family:"Fraunces", Georgia, serif;
+  font-size:1.25rem;
+  margin:0 0 6px;
+}
+.setup-sub{
+  font-size:0.8rem;
+  color:var(--ink-soft);
+  margin-bottom:18px;
+}
+.setup-choices{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:14px;
+}
+@media (max-width:560px){ .setup-choices{ grid-template-columns:1fr; } }
+.choice-card{
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:0;
+}
+.choice-card h3{
+  font-family:"Fraunces", Georgia, serif;
+  font-size:1rem;
+  margin:0;
+}
+.choice-card p{
+  font-size:0.78rem;
+  color:var(--ink-soft);
+  margin:0;
+  line-height:1.5;
+}
+.choice-card label{
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--ink-soft);
+}
+.choice-card input, .choice-card textarea{
+  font-family:"JetBrains Mono", monospace;
+  font-size:0.85rem;
+  padding:8px 10px;
+  border:1px solid var(--rule);
+  border-radius:3px;
+  background:var(--paper);
+  color:var(--ink);
+  width:100%;
+  resize:vertical;
+}
+.choice-card input:focus-visible, .choice-card textarea:focus-visible{
+  outline:2px solid var(--water-deep); outline-offset:1px;
+}
+.custom-error{ font-size:0.75rem; color:var(--bad); min-height:1.1em; }
+
+/* ---- game board ---- */
+.board{
+  display:grid;
+  grid-template-columns: 110px 1fr;
+  gap:24px;
+  align-items:start;
+}
+@media (max-width:560px){
+  .board{grid-template-columns:1fr; }
+  .glass-col{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    justify-content:flex-start;
+  }
+}
+
+.glass-col{display:flex; flex-direction:column; align-items:center; gap:8px}
+.glass-label{font-size:0.68rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.08em}
+
+svg#glass{overflow:visible}
+.droplet{ transition: opacity 0.6s ease 0.1s; }
+#waterSurface{ fill: var(--water-deep); opacity:0.75; }
+#waterBody{ fill: var(--water); }
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:22px;
+  min-width:0;
+}
+
+.riddle-eyebrow{
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:0.1em;
+  color:var(--accent);
+  margin-bottom:10px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+.riddle-display{
+  font-family:"Fraunces", Georgia, serif;
+  font-size:clamp(1.05rem, 2.6vw, 1.4rem);
+  line-height:1.65;
+  letter-spacing:0.01em;
+  word-wrap:break-word;
+  min-height:3.3em;
+}
+.riddle-display .blank{
+  display:inline-block;
+  min-width:0.62em;
+  border-bottom:2px solid var(--ink-soft);
+  margin:0 1px;
+  text-align:center;
+}
+.riddle-display .revealed{
+  color:var(--ink);
+}
+.riddle-display .space{ display:inline-block; width:0.5em; }
+.riddle-display .punct{ color:var(--ink-soft); }
+
+.status-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-top:16px;
+  font-size:0.78rem;
+  color:var(--ink-soft);
+  flex-wrap:wrap;
+  gap:8px;
+}
+.wrong-letters span{
+  display:inline-block;
+  margin-right:4px;
+  color:var(--bad);
+  text-decoration: line-through;
+}
+
+.keyboard{
+  display:grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap:6px;
+  margin-top:18px;
+}
+@media (max-width:560px){
+  .keyboard{grid-template-columns: repeat(9, 1fr);}
+}
+.key{
+  font-family: inherit;
+  font-size:0.82rem;
+  font-weight:500;
+  padding:9px 0;
+  border-radius:3px;
+  border:1px solid var(--rule);
+  background:var(--paper);
+  color:var(--ink);
+  cursor:pointer;
+  text-transform:uppercase;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.key:hover:not(:disabled){ border-color: var(--water-deep); }
+.key:active:not(:disabled){ transform: scale(0.94); }
+.key:disabled{ opacity:0.35; cursor:default; }
+.key.correct{ background:var(--good); border-color:var(--good); color:#fff; }
+.key.wrong{ background:var(--bad); border-color:var(--bad); color:#fff; }
+.key:focus-visible{ outline:2px solid var(--water-deep); outline-offset:2px; }
+
+.answer-block{
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px dashed var(--rule);
+}
+.answer-block .ab-label{
+  font-size:0.7rem;
+  text-transform:uppercase;
+  letter-spacing:0.06em;
+  color:var(--ink-soft);
+  margin-bottom:8px;
+}
+.answer-form{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.answer-form input{
+  flex:1 1 200px;
+  min-width:0;
+  font-family:"Fraunces", Georgia, serif;
+  font-size:1rem;
+  padding:10px 12px;
+  border:1px solid var(--rule);
+  border-radius:3px;
+  background:var(--paper);
+  color:var(--ink);
+}
+.answer-form input:focus-visible{ outline:2px solid var(--water-deep); outline-offset:1px; }
+.answer-form button, .btn{
+  font-family:"JetBrains Mono", monospace;
+  font-size:0.8rem;
+  text-transform:uppercase;
+  letter-spacing:0.05em;
+  padding:10px 18px;
+  border-radius:3px;
+  border:1px solid var(--ink);
+  background:var(--ink);
+  color:var(--paper);
+  cursor:pointer;
+}
+.answer-form button:hover, .btn:hover{ background:var(--water-deep); border-color:var(--water-deep); }
+.btn.ghost{ background:transparent; color:var(--ink); border-color:var(--rule); }
+.btn.ghost:hover{ background:transparent; border-color:var(--water-deep); color:var(--water-deep); }
+
+.feedback{
+  margin-top:10px;
+  font-size:0.82rem;
+  min-height:1.2em;
+}
+.feedback.good{ color:var(--good); }
+.feedback.bad{ color:var(--bad); }
+
+.overlay-msg{
+  margin-top:16px;
+  padding:16px;
+  border-radius:4px;
+  border:1px solid var(--rule);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.overlay-msg.win{ border-color:var(--good); }
+.overlay-msg.lose{ border-color:var(--bad); }
+.overlay-msg h2{
+  font-family:"Fraunces", Georgia, serif;
+  font-size:1.3rem;
+  margin:0;
+}
+.overlay-msg .answer-reveal{ color:var(--ink-soft); font-size:0.85rem; }
+.answer-reveal strong{ color: var(--ink); }
+
+.tries-left{ font-variant-numeric: tabular-nums; }
+
+footer{
+  text-align:center;
+  color:var(--ink-soft);
+  font-size:0.7rem;
+  margin-top:auto;
+  padding-top:10px;
+}
+
+[hidden]{ display:none !important; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Riddle<em>man</em></h1>
+    <div class="tagline">guess the riddle, then solve it</div>
+  </header>
+
+  <div class="setup-panel" id="setupPanel">
+    <h2>Set up the round</h2>
+    <div class="setup-sub">Pick a riddle for your group to solve, or let Riddleman choose one.</div>
+    <div class="setup-choices">
+      <div class="choice-card">
+        <h3>Surprise me</h3>
+        <p>Get a random riddle. Nobody — including whoever's reading the screen — needs to know the answer ahead of time.</p>
+        <button class="btn" id="randomBtn" type="button">Use a random riddle</button>
+      </div>
+      <div class="choice-card">
+        <h3>Bring your own</h3>
+        <p>Writing the clue yourself? One player can set this up, then hand the screen to the guessers.</p>
+        <label for="customClue">Riddle text</label>
+        <textarea id="customClue" rows="3" placeholder="e.g. What has a neck but no head, two arms but no hands?"></textarea>
+        <label for="customAnswer">Answer</label>
+        <input id="customAnswer" type="text" placeholder="e.g. a shirt">
+        <div class="custom-error" id="customError"></div>
+        <button class="btn" id="customBtn" type="button">Use my riddle</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="board" id="gameBoard" hidden>
+    <div class="glass-col">
+      <div class="glass-label">lives</div>
+      <svg id="glass" width="86" height="150" viewBox="0 0 86 150">
+        <defs>
+          <clipPath id="glassClip">
+            <path id="glassClipPath" d="M20,10 L66,10 L60,140 L26,140 Z"/>
+          </clipPath>
+        </defs>
+        <path d="M20,10 L66,10 L60,140 L26,140 Z" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linejoin="round"/>
+        <g clip-path="url(#glassClip)">
+          <path id="waterBody" d=""/>
+          <path id="waterSurface" d=""/>
+        </g>
+        <g id="drops">
+          <circle class="droplet" cx="14" cy="18" r="2.4" fill="var(--water)" opacity="0"/>
+          <circle class="droplet" cx="72" cy="30" r="2" fill="var(--water)" opacity="0"/>
+          <circle class="droplet" cx="8" cy="40" r="2.2" fill="var(--water)" opacity="0"/>
+        </g>
+      </svg>
+      <div class="glass-label"><span class="tries-left" id="triesLeft">3 left</span></div>
+    </div>
+
+    <div class="panel">
+      <div class="riddle-eyebrow" id="eyebrow">Riddle</div>
+      <div class="riddle-display" id="riddleDisplay" aria-live="polite"></div>
+
+      <div class="status-row">
+        <div>Wrong guesses: <span class="wrong-letters" id="wrongLetters"></span></div>
+      </div>
+
+      <div class="keyboard" id="keyboard"></div>
+
+      <div class="answer-block" id="answerSection">
+        <div class="ab-label">Think you know it already? Guess the riddle's answer any time &mdash; wrong guesses cost nothing.</div>
+        <form class="answer-form" id="answerForm" autocomplete="off">
+          <input id="answerInput" type="text" placeholder="What's the answer to the riddle?" aria-label="Your answer to the riddle">
+          <button type="submit">Guess</button>
+        </form>
+        <div class="feedback" id="answerFeedback"></div>
+      </div>
+
+      <div id="resultBox"></div>
+    </div>
+  </div>
+
+  <footer>Letters cost a life when wrong. Riddle-answer guesses never do.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var RIDDLES = [
+    { clue: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind.", answer: "echo" },
+    { clue: "The more you take, the more you leave behind. What am I?", answer: "footsteps" },
+    { clue: "I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. What am I?", answer: "map" },
+    { clue: "What has keys but opens no locks, space but no room, and you can enter but not go inside?", answer: "keyboard" },
+    { clue: "I am not alive, yet I grow. I do not have lungs, yet I need air. I do not have a mouth, yet water kills me. What am I?", answer: "fire" },
+    { clue: "What can travel around the world while staying in a corner?", answer: "stamp" },
+    { clue: "The person who makes it sells it. The person who buys it never uses it. The person who uses it never knows they are. What is it?", answer: "coffin" },
+    { clue: "I am taken from a mine and shut up in a wooden case, from which I am never released, and yet I am used by almost every person. What am I?", answer: "pencil lead" },
+    { clue: "What has a neck but no head, two arms but no hands?", answer: "shirt" },
+    { clue: "I am always hungry and must be fed. The finger I touch will soon turn red. What am I?", answer: "fire" }
+  ];
+
+  var MAX_WRONG = 3;
+  var state = null;
+  var lastRandomIdx = -1;
+  var waveRAF = null;
+  var waveT = 0;
+
+  function normalize(s){
+    return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  function pickRiddle(excludeIdx){
+    var idx;
+    do { idx = Math.floor(Math.random() * RIDDLES.length); }
+    while (RIDDLES.length > 1 && idx === excludeIdx);
+    return idx;
+  }
+
+  function freshState(riddleData){
+    return {
+      clue: riddleData.clue,
+      answer: riddleData.answer,
+      guessed: {},
+      wrong: [],
+      phase: "guessing", // guessing -> revealed -> won / lost
+    };
+  }
+
+  var els = {
+    setupPanel: document.getElementById("setupPanel"),
+    gameBoard: document.getElementById("gameBoard"),
+    randomBtn: document.getElementById("randomBtn"),
+    customBtn: document.getElementById("customBtn"),
+    customClue: document.getElementById("customClue"),
+    customAnswer: document.getElementById("customAnswer"),
+    customError: document.getElementById("customError"),
+    riddleDisplay: document.getElementById("riddleDisplay"),
+    wrongLetters: document.getElementById("wrongLetters"),
+    keyboard: document.getElementById("keyboard"),
+    triesLeft: document.getElementById("triesLeft"),
+    waterBody: document.getElementById("waterBody"),
+    waterSurface: document.getElementById("waterSurface"),
+    drops: document.querySelectorAll(".droplet"),
+    answerSection: document.getElementById("answerSection"),
+    answerForm: document.getElementById("answerForm"),
+    answerInput: document.getElementById("answerInput"),
+    answerFeedback: document.getElementById("answerFeedback"),
+    resultBox: document.getElementById("resultBox"),
+    eyebrow: document.getElementById("eyebrow"),
+  };
+
+  var GLASS_LEFT = 20, GLASS_RIGHT = 66, GLASS_BOTTOM = 140, GLASS_TOP = 10;
+  var prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function glassWidthAt(y){
+    // glass tapers slightly from top (46 wide) to bottom (34 wide)
+    var t = (y - GLASS_TOP) / (GLASS_BOTTOM - GLASS_TOP);
+    var topHalf = 23, botHalf = 17;
+    return topHalf + (botHalf - topHalf) * t;
+  }
+
+  function waterLevelY(){
+    var pct = Math.min(state ? state.wrong.length / MAX_WRONG : 0, 1);
+    return GLASS_BOTTOM - pct * (GLASS_BOTTOM - GLASS_TOP - 6);
+  }
+
+  function buildWavePath(baseY, amplitude, phase, closeToBottom){
+    var points = [];
+    var steps = 14;
+    for (var i = 0; i <= steps; i++){
+      var x = GLASS_LEFT - 6 + ((GLASS_RIGHT - GLASS_LEFT + 12) * i / steps);
+      var y = baseY + Math.sin(phase + i * 0.9) * amplitude;
+      points.push([x, y]);
+    }
+    var d = "M" + points[0][0].toFixed(1) + "," + points[0][1].toFixed(1);
+    for (var j = 1; j < points.length; j++){
+      var prev = points[j-1], cur = points[j];
+      var midX = (prev[0] + cur[0]) / 2;
+      d += " Q" + prev[0].toFixed(1) + "," + prev[1].toFixed(1) + " " + midX.toFixed(1) + "," + ((prev[1]+cur[1])/2).toFixed(1);
+    }
+    d += " L" + (GLASS_RIGHT + 10) + "," + GLASS_BOTTOM + 4;
+    d += " L" + (GLASS_LEFT - 10) + "," + (GLASS_BOTTOM + 4);
+    d += " Z";
+    return d;
+  }
+
+  function renderGlass(){
+    var baseY = waterLevelY();
+    var danger = state ? state.wrong.length / MAX_WRONG : 0;
+    var amplitude = prefersReducedMotion ? 0 : (1.1 + danger * 2.4);
+    els.waterBody.setAttribute("d", buildWavePath(baseY, amplitude * 0.55, waveT));
+    els.waterSurface.setAttribute("d", buildWavePath(baseY, amplitude, waveT * 1.15));
+
+    if (state && state.phase === "lost"){
+      els.drops.forEach(function(d, i){
+        d.style.opacity = "1";
+        d.style.transform = "translateY(" + (10 + i*4) + "px)";
+      });
+    } else {
+      els.drops.forEach(function(d){ d.style.opacity = "0"; d.style.transform = "none"; });
+    }
+  }
+
+  function waveLoop(){
+    waveT += 0.045;
+    renderGlass();
+    waveRAF = requestAnimationFrame(waveLoop);
+  }
+
+  function startWave(){
+    if (waveRAF) return;
+    waveLoop();
+  }
+  function stopWave(){
+    if (waveRAF){ cancelAnimationFrame(waveRAF); waveRAF = null; }
+  }
+
+  function buildDisplay(){
+    var frag = document.createDocumentFragment();
+    var text = state.clue;
+    for (var i = 0; i < text.length; i++){
+      var ch = text[i];
+      if (ch === " "){
+        var sp = document.createElement("span");
+        sp.className = "space";
+        frag.appendChild(sp);
+        continue;
+      }
+      if (!/[a-zA-Z]/.test(ch)){
+        var pu = document.createElement("span");
+        pu.className = "revealed punct";
+        pu.textContent = ch;
+        frag.appendChild(pu);
+        continue;
+      }
+      var lower = ch.toLowerCase();
+      var span = document.createElement("span");
+      if (state.guessed[lower] || state.phase !== "guessing"){
+        span.className = "revealed";
+        span.textContent = ch;
+      } else {
+        span.className = "blank";
+        span.textContent = " ";
+      }
+      frag.appendChild(span);
+    }
+    els.riddleDisplay.innerHTML = "";
+    els.riddleDisplay.appendChild(frag);
+  }
+
+  function buildKeyboard(){
+    els.keyboard.innerHTML = "";
+    var rows = "abcdefghijklmnopqrstuvwxyz".split("");
+    rows.forEach(function(letter){
+      var btn = document.createElement("button");
+      btn.className = "key";
+      btn.textContent = letter;
+      btn.type = "button";
+      btn.setAttribute("data-letter", letter);
+      btn.addEventListener("click", function(){ guessLetter(letter); });
+      els.keyboard.appendChild(btn);
+    });
+    syncKeyboard();
+  }
+
+  function syncKeyboard(){
+    var disabled = state.phase !== "guessing";
+    els.keyboard.querySelectorAll(".key").forEach(function(btn){
+      var letter = btn.getAttribute("data-letter");
+      var isGuessed = !!state.guessed[letter];
+      var isWrong = state.wrong.indexOf(letter) !== -1;
+      btn.disabled = disabled || isGuessed;
+      btn.classList.toggle("correct", isGuessed && !isWrong);
+      btn.classList.toggle("wrong", isWrong);
+    });
+  }
+
+  function allLettersFound(){
+    for (var i = 0; i < state.clue.length; i++){
+      var ch = state.clue[i].toLowerCase();
+      if (/[a-z]/.test(ch) && !state.guessed[ch]) return false;
+    }
+    return true;
+  }
+
+  function guessLetter(letter){
+    if (state.phase !== "guessing" || state.guessed[letter]) return;
+    state.guessed[letter] = true;
+    var inClue = state.clue.toLowerCase().indexOf(letter) !== -1;
+    if (!inClue){
+      state.wrong.push(letter);
+    }
+    if (state.wrong.length >= MAX_WRONG){
+      state.phase = "lost";
+    } else if (allLettersFound()){
+      state.phase = "revealed";
+    }
+    render();
+  }
+
+  function render(){
+    buildDisplay();
+    syncKeyboard();
+    renderGlass();
+
+    els.wrongLetters.innerHTML = "";
+    state.wrong.forEach(function(l){
+      var s = document.createElement("span");
+      s.textContent = l;
+      els.wrongLetters.appendChild(s);
+    });
+    if (!state.wrong.length) els.wrongLetters.textContent = "—";
+
+    var left = Math.max(MAX_WRONG - state.wrong.length, 0);
+    els.triesLeft.textContent = state.phase === "lost" ? "spilled" : (left + " left");
+
+    var active = (state.phase === "guessing" || state.phase === "revealed");
+    els.answerSection.hidden = !active;
+    if (active){
+      els.answerInput.disabled = false;
+    }
+    els.resultBox.innerHTML = "";
+
+    if (state.phase === "revealed"){
+      els.eyebrow.textContent = "Riddle revealed — now answer it";
+    } else if (state.phase === "guessing"){
+      els.eyebrow.textContent = "Riddle";
+    } else if (state.phase === "won"){
+      stopWave();
+      els.eyebrow.textContent = "Solved!";
+      var box = document.createElement("div");
+      box.className = "overlay-msg win";
+      box.innerHTML = "<h2>Correct — nicely reasoned.</h2>" +
+        "<div class='answer-reveal'>The answer was <strong>" + escapeHtml(state.answer) + "</strong>.</div>";
+      var btn = document.createElement("button");
+      btn.className = "btn";
+      btn.textContent = "Play again";
+      btn.type = "button";
+      btn.addEventListener("click", showSetup);
+      box.appendChild(btn);
+      els.resultBox.appendChild(box);
+    } else if (state.phase === "lost"){
+      stopWave();
+      els.eyebrow.textContent = "Spilled";
+      var box2 = document.createElement("div");
+      box2.className = "overlay-msg lose";
+      box2.innerHTML = "<h2>The glass spilled over.</h2>" +
+        "<div class='answer-reveal'>The riddle was: <em>“" + escapeHtml(state.clue) + "”</em><br>Answer: <strong>" + escapeHtml(state.answer) + "</strong></div>";
+      var btn2 = document.createElement("button");
+      btn2.className = "btn";
+      btn2.textContent = "Play again";
+      btn2.type = "button";
+      btn2.addEventListener("click", showSetup);
+      box2.appendChild(btn2);
+      els.resultBox.appendChild(box2);
+    }
+  }
+
+  function escapeHtml(s){
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function showSetup(){
+    stopWave();
+    state = null;
+    els.gameBoard.hidden = true;
+    els.setupPanel.hidden = false;
+    els.customError.textContent = "";
+    els.customClue.value = "";
+    els.customAnswer.value = "";
+  }
+
+  function startGame(riddleData){
+    state = freshState(riddleData);
+    els.setupPanel.hidden = true;
+    els.gameBoard.hidden = false;
+    buildKeyboard();
+    render();
+    startWave();
+  }
+
+  els.randomBtn.addEventListener("click", function(){
+    lastRandomIdx = pickRiddle(lastRandomIdx);
+    startGame(RIDDLES[lastRandomIdx]);
+  });
+
+  els.customBtn.addEventListener("click", function(){
+    var clue = els.customClue.value.trim();
+    var answer = els.customAnswer.value.trim();
+    if (!clue || !/[a-zA-Z]/.test(clue)){
+      els.customError.textContent = "Enter a riddle with at least one letter in it.";
+      return;
+    }
+    if (!answer){
+      els.customError.textContent = "Enter the answer to your riddle.";
+      return;
+    }
+    els.customError.textContent = "";
+    startGame({ clue: clue, answer: answer });
+  });
+
+  els.answerForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    if (!state || (state.phase !== "guessing" && state.phase !== "revealed")) return;
+    var guess = normalize(els.answerInput.value);
+    if (!guess) return;
+    var correct = normalize(state.answer);
+    if (guess === correct || (correct.indexOf(guess) !== -1 && guess.length >= 3)){
+      state.phase = "won";
+      render();
+    } else {
+      els.answerFeedback.textContent = "Not quite — no life lost. Try again.";
+      els.answerFeedback.className = "feedback bad";
+      els.answerInput.select();
+    }
+  });
+
+  document.addEventListener("keydown", function(e){
+    if (!state || state.phase !== "guessing") return;
+    if (document.activeElement === els.answerInput) return;
+    var k = e.key.toLowerCase();
+    if (/^[a-z]$/.test(k)){
+      guessLetter(k);
+    }
+  });
+
+  function boot(){
+    showSetup();
+  }
+
+  if (window.claude && window.claude.hot){
+    window.claude.hot.snapshot(function(){ return {}; });
+    window.claude.hot.ready ? window.claude.hot.ready(boot) : boot();
+  } else {
+    boot();
+  }
+})();
+</script>
